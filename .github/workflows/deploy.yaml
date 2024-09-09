@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - dev  # Adjust the branch as necessary
+    paths:
+      - 'deploy/**'  # Adjust this to the path where your deploy files are located
   workflow_dispatch: # Allows for manual triggering of the workflow
 
 env:
