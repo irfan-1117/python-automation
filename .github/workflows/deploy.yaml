@@ -1,38 +1,58 @@
-name: Deploy to Kubeadm Kubernetes Cluster
+name: Deploy to Kubernetes
 
 on:
-  push:
-    branches:
-      - dev  # Adjust the branch as necessary
-  workflow_dispatch: # Allows for manual triggering of the workflow
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Choose the environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+      version:
+        description: 'Version of the image'
+        required: true
+        default: 'latest'
+        type: string
 
 env:
   AWS_REGION: 'us-east-1'
   ECR_REPOSITORY: 'techiirfan'
-  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  KUBECONFIG: ${{ secrets.KUBECONFIG }} # Ensure this secret is set with your kubeconfig content
 
 permissions:
-  contents: write  
+  contents: read
+  packages: read  # Required for pulling Docker images
+  deployments: write # Required for deployments
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}  
+          aws-region: ${{ env.AWS_REGION }}
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Pull Docker image from ECR
-      run: |
-        docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+      - name: Set up Kubernetes CLI
+        uses: azure/setup-kubectl@v1
+        with:
+          version: '1.25.0' # Use a version that is compatible with your cluster
+
+      - name: Pull Docker image from Amazon ECR
+        id: pull-image
+        run: |
+          IMAGE_TAG=${{ github.event.inputs.version }}
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
