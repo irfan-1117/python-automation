@@ -3,8 +3,12 @@ name: Build and Push Docker Image to AWS ECR
 on:
   push:
     branches: [ "dev" ]
+    paths:
+      - 'build/**'  # Adjust this to the path where your build files are located
   pull_request:
     branches: [ "dev" ]
+    paths:
+      - 'build/**'  # Adjust this to the path where your build files are located
   workflow_dispatch:
     inputs:
       environment:
@@ -46,16 +50,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 pytest
           [ -f src/requirements.txt ] && pip install -r src/requirements.txt
+
       - name: Analyze with SonarCloud
         uses: SonarSource/sonarcloud-github-action@4006f663ecaf1f8093e8e4abb9227f6041f52216
         env:
-            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}   
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}   
         with:
-            args:
-              -Dsonar.projectKey=irfan-1117_Python-automation
-              -Dsonar.organization=irfan-1117
-            projectBaseDir: ./src
-    
+          args:
+            -Dsonar.projectKey=irfan-1117_Python-automation
+            -Dsonar.organization=irfan-1117
+          projectBaseDir: ./src
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -82,6 +87,7 @@ jobs:
           fi
           docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG src
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
       - name: Run Trivy vulnerability scanner
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -104,4 +110,3 @@ jobs:
         run: |
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
           echo "IMAGE_URI=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
-
